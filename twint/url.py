@@ -1,6 +1,8 @@
 import datetime
 from sys import platform
 import logging as logme
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from urllib.parse import urlencode
 from urllib.parse import quote
 
@@ -89,7 +91,7 @@ async def Search(config, init):
         ('send_error_codes', 'true'),
         ('simple_quoted_tweet', 'true'),
         ('count', tweet_count),
-        # ('query_source', 'typed_query'),
+        ('query_source', 'typed_query'),
         # ('pc', '1'),
         ('cursor', str(init)),
         ('spelling_corrections', '1'),

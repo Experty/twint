@@ -90,13 +90,17 @@ class Twint:
                     if not self.count % 40:
                         time.sleep(5)
                 elif self.config.Profile or self.config.TwitterSearch:
+                    repeat = 0
                     try:
                         self.feed, self.init = feed.parse_tweets(self.config, response)
                     except NoMoreTweetsException as e:
-                        logme.debug(__name__ + ':Twint:Feed:' + str(e))
-                        print('[!] ' + str(e) + ' Scraping will stop now.')
-                        print('found {} deleted tweets in this search.'.format(len(self.config.deleted)))
-                        break
+                        repeat += 1
+                        if repeat >= 10:
+                            logme.debug(__name__ + ':Twint:Feed:' + str(e))
+                            print('[!] ' + str(e) + ' Scraping will stop now.')
+                            print('found {} deleted tweets in this search.'.format(len(self.config.deleted)))
+                            break
+
                 break
             except TimeoutError as e:
                 if self.config.Proxy_host.lower() == "tor":
@@ -120,7 +124,6 @@ class Twint:
                     print("[!] Twitter does not return more data, scrape stops here.")
                     break
 
-                logme.critical(__name__ + ':Twint:Feed:noData' + str(e))
                 # Sometimes Twitter says there is no data. But it's a lie.
                 # raise
                 consecutive_errors_count += 1

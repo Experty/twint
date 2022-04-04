@@ -1,28 +1,33 @@
 import re
 import time
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import requests
 import logging as logme
-
+from decouple import config as envconfig
 
 class TokenExpiryException(Exception):
     def __init__(self, msg):
         super().__init__(msg)
 
-        
+
 class RefreshTokenException(Exception):
     def __init__(self, msg):
         super().__init__(msg)
-        
+
 
 class Token:
     def __init__(self, config):
         self._session = requests.Session()
         self._session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0'})
         self.config = config
-        self._retries = 5
-        self._timeout = 10
+        self._retries = 10
+        self._timeout = 60
         self.url = 'https://twitter.com'
+        self.proxies = {
+            "http": f"{str(envconfig('PROXY_URL'))}",
+            "https": f"{str(envconfig('PROXY_URL'))}",
+        }
 
     def _request(self):
         for attempt in range(self._retries + 1):
@@ -30,15 +35,19 @@ class Token:
             req = self._session.prepare_request(requests.Request('GET', self.url))
             logme.debug(f'Retrieving {req.url}')
             try:
-                r = self._session.send(req, allow_redirects=True, timeout=self._timeout)
+                r = self._session.send(req,
+                                       allow_redirects=True,
+                                       timeout=self._timeout,
+                                       proxies=self.proxies
+                                       )
             except requests.exceptions.RequestException as exc:
                 if attempt < self._retries:
                     retrying = ', retrying'
-                    level = logme.WARNING
+                    # level = logme.WARNING
                 else:
                     retrying = ''
                     level = logme.ERROR
-                logme.log(level, f'Error retrieving {req.url}: {exc!r}{retrying}')
+                # logme.log(level, f'Error retrieving {req.url}: {exc!r}{retrying}')
             else:
                 success, msg = (True, None)
                 msg = f': {msg}' if msg else ''

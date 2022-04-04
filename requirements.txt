@@ -11,3 +11,4 @@ schedule
 geopy
 fake-useragent
 googletransx
+python-decouple==3.6
