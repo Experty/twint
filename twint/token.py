@@ -6,6 +6,22 @@ import requests
 import logging as logme
 from decouple import config as envconfig
 
+
+import requests
+from decouple import config
+from datetime import date
+import random
+
+
+def proxy_list():
+    try:
+        proxys = requests.get(config('PROXY_LIST_URL')).text.split()
+        random.shuffle(proxys)
+        return proxys
+    except Exception as err:
+        print(date.today(), err)
+
+
 class TokenExpiryException(Exception):
     def __init__(self, msg):
         super().__init__(msg)
@@ -22,24 +38,38 @@ class Token:
         self._session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0'})
         self.config = config
         self._retries = 10
+        self.rotate_proxy = str(envconfig('ROTATE_PROXY'))
         self._timeout = 60
         self.url = 'https://twitter.com'
-        self.proxies = {
-            "http": f"{str(envconfig('PROXY_URL'))}",
-            "https": f"{str(envconfig('PROXY_URL'))}",
-        }
 
     def _request(self):
+        proxies = proxy_list()
         for attempt in range(self._retries + 1):
             # The request is newly prepared on each retry because of potential cookie updates.
             req = self._session.prepare_request(requests.Request('GET', self.url))
             logme.debug(f'Retrieving {req.url}')
             try:
-                r = self._session.send(req,
-                                       allow_redirects=True,
-                                       timeout=self._timeout,
-                                       proxies=self.proxies
-                                       )
+                if eval((self.rotate_proxy).title()):
+                    self.proxies = {
+                        "http": f"{str(envconfig('PROXY_URL'))}",
+                        "https": f"{str(envconfig('PROXY_URL'))}",
+                    }
+                    r = self._session.send(req,
+                                           allow_redirects=True,
+                                           timeout=self._timeout,
+                                           proxies=self.proxies
+                                           )
+                else:
+                    proxy = random.choice(proxies)
+                    self.proxies = {
+                        "http": f"{str(proxy)}",
+                        "https": f"{str(proxy)}",
+                    }
+                    r = self._session.send(req,
+                                           allow_redirects=True,
+                                           timeout=self._timeout,
+                                           proxies=self.proxies
+                                           )
             except requests.exceptions.RequestException as exc:
                 if attempt < self._retries:
                     retrying = ', retrying'
