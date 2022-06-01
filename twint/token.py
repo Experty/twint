@@ -3,23 +3,39 @@ import time
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import requests
+
 import logging as logme
 from decouple import config as envconfig
+from fake_useragent import UserAgent
+ua = UserAgent(verify_ssl=False)
 
 
-import requests
 from decouple import config
 from datetime import date
 import random
 
 
 def proxy_list():
-    try:
-        proxys = requests.get(config('PROXY_LIST_URL')).text.split()
-        random.shuffle(proxys)
-        return proxys
-    except Exception as err:
-        print(date.today(), err)
+    try_times = 0
+    while True:
+        try:
+            proxys = requests.get(config('PROXY_LIST_URL')).text.split()
+            random.shuffle(proxys)
+            return proxys
+        except requests.exceptions.Timeout:
+            try_times += 1
+            if try_times >= 10:
+                break
+            else:
+                continue
+        except requests.exceptions.ReadTimeout:
+            try_times += 1
+            if try_times >= 10:
+                break
+            else:
+                continue
+        except Exception as err:
+            print(date.today(), err)
 
 
 class TokenExpiryException(Exception):
@@ -35,18 +51,20 @@ class RefreshTokenException(Exception):
 class Token:
     def __init__(self, config):
         self._session = requests.Session()
-        self._session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0'})
+        self._session.verify = False
+        self._session.headers.update({'User-Agent': f'{ua.random}'})
         self.config = config
         self._retries = 10
         self.rotate_proxy = str(envconfig('ROTATE_PROXY'))
-        self._timeout = 60
-        self.url = 'https://twitter.com'
+        self._timeout = 10
+        self._session.headers.update({'authorization': 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'})
+        self.url = 'https://api.twitter.com/1.1/guest/activate.json'
 
     def _request(self):
         proxies = proxy_list()
         for attempt in range(self._retries + 1):
             # The request is newly prepared on each retry because of potential cookie updates.
-            req = self._session.prepare_request(requests.Request('GET', self.url))
+            req = self._session.prepare_request(requests.Request('POST', self.url))
             logme.debug(f'Retrieving {req.url}')
             try:
                 if eval((self.rotate_proxy).title()):
@@ -99,10 +117,39 @@ class Token:
     def refresh(self):
         logme.debug('Retrieving guest token')
         res = self._request()
-        match = re.search(r'\("gt=(\d+);', res.text)
-        if match:
+        res_json = res.json()
+        if "guest_token" in res_json.keys():
             logme.debug('Found guest token in HTML')
-            self.config.Guest_token = str(match.group(1))
+            self.config.Guest_token = res_json["guest_token"]
         else:
-            self.config.Guest_token = None
-            raise RefreshTokenException('Could not find the Guest token in HTML')
+            try:
+                headers = {'User-Agent': f'{ua.random}',
+                           'authority': 'api.twitter.com',
+                           'content-length': '0',
+                           'authorization': self.config.Bearer_token,
+                           'x-twitter-client-language': 'en',
+                           'x-csrf-token': res.cookies.get("ct0"),
+                           'x-twitter-active-user': 'yes',
+                           'content-type': 'application/x-www-form-urlencoded',
+                           'Accept': 'application/json',
+                           'sec-gpc': '1',
+                           'origin': 'https://twitter.com',
+                           'sec-fetch-site': 'same-site',
+                           'sec-fetch-mode': 'cors',
+                           'sec-fetch-dest': 'empty',
+                           'referer': 'https://twitter.com/',
+                           'accept-language': 'en-US',
+                           }
+                self._session.headers.update(headers)
+                req = self._session.prepare_request(
+                requests.Request('POST', 'https://api.twitter.com/1.1/guest/activate.json'))
+                res = self._session.send(req, allow_redirects=True, timeout=self._timeout)
+                match = re.search(r'{"guest_token":"(\d+)"}', res.text)
+            except requests.exceptions.ConnectionError:
+                time.sleep(100)
+            if match:
+                logme.debug('Found guest token in JSON')
+                self.config.Guest_token = str(match.group(1))
+            else:
+                self.config.Guest_token = None
+                raise RefreshTokenException('Could not find the Guest token in JSON')
