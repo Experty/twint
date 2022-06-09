@@ -15,29 +15,6 @@ from datetime import date
 import random
 
 
-def proxy_list():
-    try_times = 0
-    while True:
-        try:
-            proxys = requests.get(config('PROXY_LIST_URL')).text.split()
-            random.shuffle(proxys)
-            return proxys
-        except requests.exceptions.Timeout:
-            try_times += 1
-            if try_times >= 10:
-                break
-            else:
-                continue
-        except requests.exceptions.ReadTimeout:
-            try_times += 1
-            if try_times >= 10:
-                break
-            else:
-                continue
-        except Exception as err:
-            print(date.today(), err)
-
-
 class TokenExpiryException(Exception):
     def __init__(self, msg):
         super().__init__(msg)
@@ -61,7 +38,6 @@ class Token:
         self.url = 'https://api.twitter.com/1.1/guest/activate.json'
 
     def _request(self):
-        proxies = proxy_list()
         for attempt in range(self._retries + 1):
             # The request is newly prepared on each retry because of potential cookie updates.
             req = self._session.prepare_request(requests.Request('POST', self.url))
@@ -78,7 +54,7 @@ class Token:
                                            proxies=self.proxies
                                            )
                 else:
-                    proxy = random.choice(proxies)
+                    proxy = random.choice(self.config.Proxy_list)
                     self.proxies = {
                         "http": f"{str(proxy)}",
                         "https": f"{str(proxy)}",
