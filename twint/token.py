@@ -32,7 +32,6 @@ class Token:
         self._session.headers.update({'User-Agent': f'{ua.random}'})
         self.config = config
         self._retries = 10
-        self.rotate_proxy = str(envconfig('ROTATE_PROXY'))
         self._timeout = 10
         self._session.headers.update({'authorization': 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'})
         self.url = 'https://api.twitter.com/1.1/guest/activate.json'
@@ -43,7 +42,7 @@ class Token:
             req = self._session.prepare_request(requests.Request('POST', self.url))
             logme.debug(f'Retrieving {req.url}')
             try:
-                if eval((self.rotate_proxy).title()):
+                if eval((self.config.Rotate_proxy).title()):
                     self.proxies = {
                         "http": f"{str(envconfig('PROXY_URL'))}",
                         "https": f"{str(envconfig('PROXY_URL'))}",

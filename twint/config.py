@@ -62,6 +62,7 @@ class Config:
     Proxy_port: int = 0
     Proxy_type: object = None
     Proxy_list: list = None
+    Rotate_proxy: bool = False
     Tor_control_port: int = 9051
     Tor_control_password: str = None
     Retweets: bool = False
